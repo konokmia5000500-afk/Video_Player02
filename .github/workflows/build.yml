@@ -1,13 +1,14 @@
-name: Build Fast Player APK from ZIP
+name: Build Fast Player APK
 
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [ "**" ]
 
 jobs:
   build-apk:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -18,20 +19,34 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Extract fast-player.zip
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Extract ZIP file
         run: |
           mkdir -p build_src
-          unzip -o -q fast-player.zip -d build_src
+          ZIP_FILE=$(find . -maxdepth 2 -iname "*.zip" | head -n 1)
+          if [ -z "$ZIP_FILE" ]; then
+            echo "Error: No .zip file found in repository!"
+            ls -la
+            exit 1
+          fi
+          echo "Extracting: $ZIP_FILE"
+          unzip -o -q "$ZIP_FILE" -d build_src
           ls -la build_src
 
       - name: Build Debug APK
         run: |
-          cd build_src
-          chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          PROJECT_DIR=$(dirname "$(find build_src -name "settings.gradle.kts" | head -n 1)")
+          echo "Project directory: $PROJECT_DIR"
+          cd "$PROJECT_DIR"
+          gradle :app:assembleDebug --no-daemon
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
           name: fast-player-debug-apk
-          path: build_src/app/build/outputs/apk/debug/app-debug.apk
+          path: build_src/**/app/build/outputs/apk/debug/*.apk
+
