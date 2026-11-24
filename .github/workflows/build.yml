@@ -1,48 +1,37 @@
-name: Build APK
+name: Build Fast Player APK from ZIP
+
 on:
   workflow_dispatch:
   push:
-    branches: ["**"]
-permissions:
-  contents: write
+    branches: [ main ]
+
 jobs:
-  build:
+  build-apk:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Unzip project
-        run: |
-          ZIP=$(ls *.zip 2>/dev/null | head -n 1 || true)
-          if [ -n "$ZIP" ]; then
-            echo "Using zip: $ZIP"
-            unzip -q "$ZIP" -d proj
-            PROJ=$(dirname "$(find proj -name settings.gradle.kts | head -n 1)")
-          else
-            PROJ=.
-          fi
-          echo "Project folder: $PROJ"
-          echo "PROJ=$PROJ" >> "$GITHUB_ENV"
-      - uses: actions/setup-java@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: "17"
-      - name: Accept Android SDK licenses
-        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
-      - uses: gradle/actions/setup-gradle@v4
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Extract fast-player.zip
+        run: |
+          mkdir -p build_src
+          unzip -o -q fast-player.zip -d build_src
+          ls -la build_src
+
+      - name: Build Debug APK
+        run: |
+          cd build_src
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
         with:
-          gradle-version: "8.7"
-      - name: Build release APK
-        shell: bash
-        run: |
-          cd "$PROJ"
-          gradle assembleRelease --no-daemon --console=plain > "$GITHUB_WORKSPACE/build.log" 2>&1 || { grep -nE 'What went wrong|FAILED|Caused by|Missing class|^e: ' -A4 "$GITHUB_WORKSPACE/build.log" | head -100; exit 1; }
-      - name: Publish single APK to Releases
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cp "$PROJ"/app/build/outputs/apk/release/*.apk SwiftPlayer.apk
-          ls -lh SwiftPlayer.apk
-          gh release create "v${{ github.run_number }}" SwiftPlayer.apk \
-            --target "${{ github.sha }}" \
-            --title "Swift Player build ${{ github.run_number }}" \
-            --notes "Release APK (arm64)"
+          name: fast-player-debug-apk
+          path: build_src/app/build/outputs/apk/debug/app-debug.apk
