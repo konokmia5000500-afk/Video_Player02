@@ -49,6 +49,20 @@ jobs:
           fi
           echo "Building project at: $PROJECT_ROOT"
           cd "$PROJECT_ROOT"
+
+          if [ ! -f "debug.keystore" ]; then
+            echo "Generating temporary debug.keystore..."
+            keytool -genkeypair \
+              -keystore debug.keystore \
+              -storepass android \
+              -keypass android \
+              -alias androiddebugkey \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
           gradle :app:assembleDebug --no-daemon
 
       - name: Upload Debug APK Artifact
