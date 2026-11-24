@@ -3,7 +3,7 @@ name: Build Fast Player APK from ZIP
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [ Version004]
 
 jobs:
   build-apk:
